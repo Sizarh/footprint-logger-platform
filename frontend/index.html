@@ -2,50 +2,176 @@
 <html>
 <head>
   <title>Footprint Logger</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
+<!-- LOGIN DISPLAY -->
+<h2 id="welcome"></h2>
+<button onclick="logout()">Logout</button>
+
 <h1>Footprint Logger</h1>
+
+<!-- CATEGORY -->
+<select id="category">
+  <option value="transport">Transport</option>
+  <option value="food">Food</option>
+  <option value="energy">Energy</option>
+</select>
+
+<!-- PRESET ACTIVITIES -->
+<select id="preset" onchange="fillCO2()">
+  <option value="">Select Activity</option>
+  <option value="Car Travel" data-co2="20">Car Travel</option>
+  <option value="Bus Travel" data-co2="10">Bus Travel</option>
+  <option value="Meat Consumption" data-co2="15">Meat Consumption</option>
+  <option value="Electricity Use" data-co2="25">Electricity Use</option>
+</select>
+
+<br><br>
 
 <input type="text" id="name" placeholder="Activity Name">
 <input type="number" id="co2" placeholder="CO2 Value">
 <button onclick="addActivity()">Add</button>
 
+<h3>Total CO2: <span id="total">0</span></h3>
+
+<!-- FILTER -->
+<select onchange="filterActivities(this.value)">
+  <option value="all">All</option>
+  <option value="transport">Transport</option>
+  <option value="food">Food</option>
+  <option value="energy">Energy</option>
+</select>
+
 <ul id="list"></ul>
 
+<h3>Insights</h3>
+<p id="insight"></p>
+
+<canvas id="chart" width="400" height="200"></canvas>
+
 <script>
-const API_URL = "http://localhost:5000/api/activities";
 
-async function addActivity() {
-  const name = document.getElementById("name").value;
-  const co2 = document.getElementById("co2").value;
+// LOGIN DISPLAY
+const user = localStorage.getItem("user");
 
-  await fetch(API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ name, co2 })
-  });
-
-  loadActivities();
+if (user) {
+  document.getElementById("welcome").textContent = "Welcome, " + user;
 }
 
-async function loadActivities() {
-  const res = await fetch(API_URL);
-  const data = await res.json();
 
+function logout() {
+  localStorage.removeItem("user");
+
+  // 🔁 Redirect properly
+  window.location.href = "login.html";
+}
+
+// DATA
+let activities = JSON.parse(localStorage.getItem("activities")) || [];
+
+// PRESET CO2
+function fillCO2() {
+  const preset = document.getElementById("preset");
+  const selected = preset.options[preset.selectedIndex];
+  const co2 = selected.getAttribute("data-co2");
+
+  if (co2) {
+    document.getElementById("co2").value = co2;
+    document.getElementById("name").value = selected.value;
+  }
+}
+
+// ADD ACTIVITY
+function addActivity() {
+  const name = document.getElementById("name").value;
+  const co2 = Number(document.getElementById("co2").value);
+  const category = document.getElementById("category").value;
+
+  if (!name || !co2) {
+    alert("Fill all fields");
+    return;
+  }
+
+  const newActivity = { name, co2, category };
+
+  activities.push(newActivity);
+
+  localStorage.setItem("activities", JSON.stringify(activities));
+
+  document.getElementById("name").value = "";
+  document.getElementById("co2").value = "";
+
+  render();
+}
+
+// RENDER
+function render(filter = "all") {
   const list = document.getElementById("list");
   list.innerHTML = "";
 
-  data.forEach(item => {
+  let total = 0;
+
+  let filtered = activities.filter(a => filter === "all" || a.category === filter);
+
+  filtered.forEach(a => {
+    total += a.co2;
+
     const li = document.createElement("li");
-    li.textContent = item.name + " - " + item.co2;
+    li.textContent = `${a.name} (${a.category}) - ${a.co2}`;
     list.appendChild(li);
+  });
+
+  document.getElementById("total").textContent = total;
+
+  showInsights();
+  drawChart();
+}
+
+// FILTER
+function filterActivities(category) {
+  render(category);
+}
+
+// INSIGHTS
+function showInsights() {
+  if (activities.length === 0) return;
+
+  let max = activities.reduce((a, b) => (a.co2 > b.co2 ? a : b));
+
+  document.getElementById("insight").textContent =
+    `Highest emission: ${max.name}. Try reducing this activity.`;
+}
+
+// CHART
+function drawChart() {
+  const categories = { transport: 0, food: 0, energy: 0 };
+
+  activities.forEach(a => {
+    categories[a.category] += a.co2;
+  });
+
+  const ctx = document.getElementById("chart");
+
+  new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: ["Transport", "Food", "Energy"],
+      datasets: [{
+        data: [
+          categories.transport,
+          categories.food,
+          categories.energy
+        ]
+      }]
+    }
   });
 }
 
-loadActivities();
+// INITIAL LOAD
+render();
+
 </script>
 
 </body>
