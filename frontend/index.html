@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Footprint Logger</title>
+</head>
+<body>
+
+<h1>Footprint Logger</h1>
+
+<input type="text" id="name" placeholder="Activity Name">
+<input type="number" id="co2" placeholder="CO2 Value">
+<button onclick="addActivity()">Add</button>
+
+<ul id="list"></ul>
+
+<script>
+const API_URL = "http://localhost:5000/api/activities";
+
+async function addActivity() {
+  const name = document.getElementById("name").value;
+  const co2 = document.getElementById("co2").value;
+
+  await fetch(API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ name, co2 })
+  });
+
+  loadActivities();
+}
+
+async function loadActivities() {
+  const res = await fetch(API_URL);
+  const data = await res.json();
+
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  data.forEach(item => {
+    const li = document.createElement("li");
+    li.textContent = item.name + " - " + item.co2;
+    list.appendChild(li);
+  });
+}
+
+loadActivities();
+</script>
+
+</body>
+</html>
